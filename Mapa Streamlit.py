@@ -60,15 +60,10 @@ fecha = st.selectbox("Seleccione una fecha", fechas)
 datos_filtrados = df[(df["GESTOR"] == gestor) & (df["FECHA_GESTION"].dt.strftime("%Y-%m-%d") == fecha)]
 datos_filtrados = datos_filtrados.sort_values("HORA_ORDEN").reset_index(drop=True)
 
-# === MANTENER VISTA DEL MAPA ===
-if "zoom" not in st.session_state:
-    st.session_state.zoom = 12
-
-if "center" not in st.session_state:
-    st.session_state.center = {
-        "lat": datos_filtrados["LATITUD"].mean(),
-        "lon": datos_filtrados["LONGITUD"].mean()
-    }
+# === CENTRO Y ZOOM ESTABLES ===
+center_lat = datos_filtrados["LATITUD"].mean()
+center_lon = datos_filtrados["LONGITUD"].mean()
+zoom_level = 12
 
 if len(datos_filtrados) == 0:
     st.warning("No hay datos para mostrar.")
@@ -150,8 +145,8 @@ else:
     fig.update_layout(
         mapbox=dict(
             style="open-street-map",
-            center=st.session_state.center,
-            zoom=st.session_state.zoom
+            center=dict(lat=center_lat, lon=center_lon),
+            zoom=zoom_level
         ),
         margin=dict(r=0, t=0, l=0, b=0),
         uirevision="static"
