@@ -143,24 +143,26 @@ else:
         hoverinfo='text'
     ))
 
-    if "view_config" not in st.session_state:
-        st.session_state.view_config = {
-            "lat": datos_filtrados["LATITUD"].mean(),
-            "lon": datos_filtrados["LONGITUD"].mean(),
-            "zoom": 12
-        }
+if "view_config" not in st.session_state:
+    st.session_state.view_config = {
+        "lat": datos_filtrados["LATITUD"].mean(),
+        "lon": datos_filtrados["LONGITUD"].mean(),
+        "zoom": 12
+    }
 
-    fig.update_layout(
-        mapbox=dict(
-            style="open-street-map",
-            center=dict(
-                lat=st.session_state.view_config["lat"],
-                lon=st.session_state.view_config["lon"]
-            ),
-            zoom=st.session_state.view_config["zoom"]
-        ),
-        margin=dict(r=0, t=0, l=0, b=0),
-        uirevision="keep"
-    )
+mapbox_center = dict(
+    lat=st.session_state.view_config["lat"],
+    lon=st.session_state.view_config["lon"]
+)
 
-    st.plotly_chart(fig, use_container_width=True)
+fig.update_layout(
+    mapbox=dict(
+        style="open-street-map",
+        center=mapbox_center,
+        zoom=st.session_state.view_config["zoom"]
+    ),
+    margin=dict(r=0, t=0, l=0, b=0),
+    uirevision="fixed"  # Valor constante
+)
+
+st.plotly_chart(fig, use_container_width=True)
