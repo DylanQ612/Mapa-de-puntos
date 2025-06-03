@@ -150,19 +150,17 @@ if fecha_key not in st.session_state:
         "zoom": 12
     }
 
-mapbox_center = {
-    "lat": st.session_state[fecha_key]["lat"],
-    "lon": st.session_state[fecha_key]["lon"]
-}
+# Usar los valores guardados sin recalcular
+vista_fija = st.session_state[fecha_key]
 
 fig.update_layout(
     mapbox=dict(
         style="open-street-map",
-        center=mapbox_center,
-        zoom=st.session_state[fecha_key]["zoom"]
+        center={"lat": vista_fija["lat"], "lon": vista_fija["lon"]},
+        zoom=vista_fija["zoom"]
     ),
     margin=dict(r=0, t=0, l=0, b=0),
-    uirevision="fixed"
+    uirevision=fecha  # uirevision constante por fecha
 )
 
 st.plotly_chart(fig, use_container_width=True)
