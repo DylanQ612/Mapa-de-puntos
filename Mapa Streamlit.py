@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -8,6 +5,7 @@ import plotly.graph_objects as go
 from sqlalchemy import create_engine, URL
 
 # === CONEXIÓN A BASE DE DATOS ===
+# (Mantengo tu configuración original)
 server = st.secrets["server"]
 database = st.secrets["database"]
 username = st.secrets["username"]
@@ -26,10 +24,8 @@ engine = create_engine(connection_url)
 # === CARGA DE DATOS ===
 @st.cache_data
 def cargar_datos():
-    query = (
-        'SELECT * FROM GESTIONES_APVAP '
-        'WHERE CONVERT(date, FECHAVISITA) = DATEADD(day, -14, CONVERT(date, GETDATE()))'
-    )
+    query = """SELECT * FROM GESTIONES_APVAP
+               WHERE CONVERT(date, FECHAVISITA) = DATEADD(day, -14, CONVERT(date, GETDATE()))"""
     df = pd.read_sql(query, engine)
     df.columns = df.columns.str.strip().str.upper()
     df = df.rename(columns={
@@ -65,16 +61,6 @@ fecha = st.selectbox("Seleccione una fecha", fechas)
 datos_filtrados = df[(df["GESTOR"] == gestor) & (df["FECHA_GESTION"].dt.strftime("%Y-%m-%d") == fecha)]
 datos_filtrados = datos_filtrados.sort_values("HORA_ORDEN").reset_index(drop=True)
 
-# === GUARDAR VISTA FIJA DEL MAPA UNA SOLA VEZ ===
-fecha_key = f"view_config_{fecha}"
-if fecha_key not in st.session_state:
-    st.session_state[fecha_key] = {
-        "lat": datos_filtrados["LATITUD"].mean(),
-        "lon": datos_filtrados["LONGITUD"].mean(),
-        "zoom": 12
-    }
-vista_fija = st.session_state[fecha_key]
-
 if len(datos_filtrados) == 0:
     st.warning("No hay datos para mostrar.")
 else:
@@ -101,8 +87,13 @@ else:
         f"<b>Efectiva:</b> {row['EFECTIVA']}"
     ), axis=1)
 
+    # Calculamos el centro del mapa una sola vez
+    center_lat = datos_filtrados["LATITUD"].mean()
+    center_lon = datos_filtrados["LONGITUD"].mean()
+
     fig = go.Figure()
 
+    # Traces base (siempre presentes)
     fig.add_trace(go.Scattermapbox(
         lat=datos_filtrados["LATITUD"],
         lon=datos_filtrados["LONGITUD"],
@@ -120,6 +111,8 @@ else:
     ))
 
     idx = st.session_state.indice
+    
+    # Puntos anteriores
     if idx > 0:
         prev = datos_filtrados.iloc[:idx]
         fig.add_trace(go.Scattermapbox(
@@ -139,6 +132,7 @@ else:
             hoverinfo='skip'
         ))
 
+    # Punto actual
     actual = datos_filtrados.iloc[idx]
     fig.add_trace(go.Scattermapbox(
         lat=[actual["LATITUD"]],
@@ -152,14 +146,15 @@ else:
         hoverinfo='text'
     ))
 
+    # Configuración del layout con uirevision fija
     fig.update_layout(
         mapbox=dict(
             style="open-street-map",
-            center={"lat": vista_fija["lat"], "lon": vista_fija["lon"]},
-            zoom=vista_fija["zoom"]
+            center=dict(lat=center_lat, lon=center_lon),
+            zoom=12
         ),
         margin=dict(r=0, t=0, l=0, b=0),
-        uirevision="mapa-fijo"
+        uirevision="no_reset"  # Valor fijo para mantener el estado
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': False})
