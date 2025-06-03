@@ -1,7 +1,10 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import streamlit as st
 from sqlalchemy import create_engine, URL
 
 # === CONEXIÓN A BASE DE DATOS ===
@@ -23,8 +26,10 @@ engine = create_engine(connection_url)
 # === CARGA DE DATOS ===
 @st.cache_data
 def cargar_datos():
-    query = """SELECT * FROM GESTIONES_APVAP
-               WHERE CONVERT(date, FECHAVISITA) = DATEADD(day, -14, CONVERT(date, GETDATE()))"""
+    query = (
+        'SELECT * FROM GESTIONES_APVAP '
+        'WHERE CONVERT(date, FECHAVISITA) = DATEADD(day, -14, CONVERT(date, GETDATE()))'
+    )
     df = pd.read_sql(query, engine)
     df.columns = df.columns.str.strip().str.upper()
     df = df.rename(columns={
@@ -43,6 +48,7 @@ def cargar_datos():
     df["FECHA_GESTION"] = pd.to_datetime(df["FECHA_GESTION"])
     df["HORA_ORDEN"] = pd.to_datetime(df["HORA_GESTION"], format="%I:%M%p", errors='coerce').dt.time
     df["EFECTIVA"] = np.where(df["RESULTADO"].isin(["PP", "DP"]), "Efectiva", "No Efectiva")
+    df["COLOR"] = np.where(df["EFECTIVA"] == "Efectiva", "green", "red")
     df = df.sort_values(by=["GESTOR", "FECHA_GESTION", "HORA_ORDEN"])
     return df
 
@@ -58,6 +64,16 @@ fecha = st.selectbox("Seleccione una fecha", fechas)
 
 datos_filtrados = df[(df["GESTOR"] == gestor) & (df["FECHA_GESTION"].dt.strftime("%Y-%m-%d") == fecha)]
 datos_filtrados = datos_filtrados.sort_values("HORA_ORDEN").reset_index(drop=True)
+
+# === GUARDAR VISTA FIJA DEL MAPA UNA SOLA VEZ ===
+fecha_key = f"view_config_{fecha}"
+if fecha_key not in st.session_state:
+    st.session_state[fecha_key] = {
+        "lat": datos_filtrados["LATITUD"].mean(),
+        "lon": datos_filtrados["LONGITUD"].mean(),
+        "zoom": 12
+    }
+vista_fija = st.session_state[fecha_key]
 
 if len(datos_filtrados) == 0:
     st.warning("No hay datos para mostrar.")
@@ -75,14 +91,6 @@ else:
     with col3:
         st.markdown(f"**Punto {st.session_state.indice + 1} de {len(datos_filtrados)}**")
 
-    # Guardar vista del mapa una sola vez
-    if "vista_fija" not in st.session_state:
-        st.session_state.vista_fija = {
-            "lat": datos_filtrados["LATITUD"].mean(),
-            "lon": datos_filtrados["LONGITUD"].mean(),
-            "zoom": 12
-        }
-
     datos_filtrados["HOVER_TEXT"] = datos_filtrados.apply(lambda row: (
         f"<b>Gestión #{row.name + 1}</b><br>"
         f"<b>Gestor:</b> {row['GESTOR']}<br>"
@@ -93,7 +101,6 @@ else:
         f"<b>Efectiva:</b> {row['EFECTIVA']}"
     ), axis=1)
 
-    idx = st.session_state.indice
     fig = go.Figure()
 
     fig.add_trace(go.Scattermapbox(
@@ -112,6 +119,7 @@ else:
         hoverinfo='skip'
     ))
 
+    idx = st.session_state.indice
     if idx > 0:
         prev = datos_filtrados.iloc[:idx]
         fig.add_trace(go.Scattermapbox(
@@ -147,14 +155,11 @@ else:
     fig.update_layout(
         mapbox=dict(
             style="open-street-map",
-            center=dict(
-                lat=st.session_state.vista_fija["lat"],
-                lon=st.session_state.vista_fija["lon"]
-            ),
-            zoom=st.session_state.vista_fija["zoom"]
+            center={"lat": vista_fija["lat"], "lon": vista_fija["lon"]},
+            zoom=vista_fija["zoom"]
         ),
         margin=dict(r=0, t=0, l=0, b=0),
-        uirevision="vista_fija"
+        uirevision="mapa-fijo"
     )
 
     st.plotly_chart(fig, use_container_width=True)
