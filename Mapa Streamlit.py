@@ -11,10 +11,10 @@ import plotly.graph_objects as go
 from sqlalchemy import create_engine, URL
 
 # === CONEXIÓN A BASE DE DATOS ===
-server = '52.167.231.145,51433'
-database = 'CreditoYCobranza'
-username = 'credito'
-password = 'Cr3d$.23xme'
+server = st.secrets["server"]
+database = st.secrets["database"]
+username = st.secrets["username"]
+password = st.secrets["password"]
 
 connection_url = URL.create(
     "mssql+pyodbc",
