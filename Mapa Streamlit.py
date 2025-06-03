@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
-
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -29,8 +26,10 @@ engine = create_engine(connection_url)
 # === CARGA DE DATOS ===
 @st.cache_data
 def cargar_datos():
-    query = """SELECT * FROM GESTIONES_APVAP
-               WHERE CONVERT(date, FECHAVISITA) = DATEADD(day, -14, CONVERT(date, GETDATE()))"""
+    query = (
+        'SELECT * FROM GESTIONES_APVAP '
+        'WHERE CONVERT(date, FECHAVISITA) = DATEADD(day, -14, CONVERT(date, GETDATE()))'
+    )
     df = pd.read_sql(query, engine)
     df.columns = df.columns.str.strip().str.upper()
     df = df.rename(columns={
@@ -143,27 +142,28 @@ else:
         hoverinfo='text'
     ))
 
-if "view_config" not in st.session_state:
-    st.session_state.view_config = {
+fecha_key = f"view_config_{fecha}"
+if fecha_key not in st.session_state:
+    st.session_state[fecha_key] = {
         "lat": datos_filtrados["LATITUD"].mean(),
         "lon": datos_filtrados["LONGITUD"].mean(),
         "zoom": 12
     }
 
-# === CORRECCIÓN PARA FIJAR VISTA DEL MAPA ===
 mapbox_center = {
-    "lat": st.session_state.view_config["lat"],
-    "lon": st.session_state.view_config["lon"]
+    "lat": st.session_state[fecha_key]["lat"],
+    "lon": st.session_state[fecha_key]["lon"]
 }
 
 fig.update_layout(
     mapbox=dict(
         style="open-street-map",
         center=mapbox_center,
-        zoom=st.session_state.view_config["zoom"]
+        zoom=st.session_state[fecha_key]["zoom"]
     ),
     margin=dict(r=0, t=0, l=0, b=0),
     uirevision="fixed"
 )
 
 st.plotly_chart(fig, use_container_width=True)
+
