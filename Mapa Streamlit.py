@@ -26,10 +26,10 @@ engine = create_engine(connection_url)
 # === CARGA DE DATOS ===
 @st.cache_data
 def cargar_datos():
-    query = (
-        'SELECT * FROM GESTIONES_APVAP '
-        'WHERE CONVERT(date, FECHAVISITA) = DATEADD(day, -14, CONVERT(date, GETDATE()))'
-    )
+    query = """
+        SELECT * FROM GESTIONES_APVAP
+        WHERE CONVERT(date, FECHAVISITA) = DATEADD(day, -14, CONVERT(date, GETDATE()))
+    """
     df = pd.read_sql(query, engine)
     df.columns = df.columns.str.strip().str.upper()
     df = df.rename(columns={
@@ -65,16 +65,6 @@ fecha = st.selectbox("Seleccione una fecha", fechas)
 datos_filtrados = df[(df["GESTOR"] == gestor) & (df["FECHA_GESTION"].dt.strftime("%Y-%m-%d") == fecha)]
 datos_filtrados = datos_filtrados.sort_values("HORA_ORDEN").reset_index(drop=True)
 
-# === GUARDAR VISTA FIJA DEL MAPA UNA SOLA VEZ ===
-fecha_key = f"view_config_{fecha}"
-if fecha_key not in st.session_state:
-    st.session_state[fecha_key] = {
-        "lat": datos_filtrados["LATITUD"].mean(),
-        "lon": datos_filtrados["LONGITUD"].mean(),
-        "zoom": 12
-    }
-vista_fija = st.session_state[fecha_key]
-
 if len(datos_filtrados) == 0:
     st.warning("No hay datos para mostrar.")
 else:
@@ -101,8 +91,13 @@ else:
         f"<b>Efectiva:</b> {row['EFECTIVA']}"
     ), axis=1)
 
+    idx = st.session_state.indice
+    actual = datos_filtrados.iloc[idx]
+    prev = datos_filtrados.iloc[:idx] if idx > 0 else pd.DataFrame(columns=datos_filtrados.columns)
+
     fig = go.Figure()
 
+    # Fondo de todos los puntos
     fig.add_trace(go.Scattermapbox(
         lat=datos_filtrados["LATITUD"],
         lon=datos_filtrados["LONGITUD"],
@@ -111,6 +106,7 @@ else:
         hoverinfo='skip'
     ))
 
+    # Línea completa
     fig.add_trace(go.Scattermapbox(
         lat=datos_filtrados["LATITUD"],
         lon=datos_filtrados["LONGITUD"],
@@ -119,27 +115,26 @@ else:
         hoverinfo='skip'
     ))
 
-    idx = st.session_state.indice
-    if idx > 0:
-        prev = datos_filtrados.iloc[:idx]
-        fig.add_trace(go.Scattermapbox(
-            lat=prev["LATITUD"],
-            lon=prev["LONGITUD"],
-            mode='markers',
-            marker=dict(size=12, color='blue'),
-            hovertext=prev["HOVER_TEXT"],
-            hoverinfo='text'
-        ))
+    # Puntos anteriores (si hay)
+    fig.add_trace(go.Scattermapbox(
+        lat=prev["LATITUD"] if not prev.empty else [None],
+        lon=prev["LONGITUD"] if not prev.empty else [None],
+        mode='markers',
+        marker=dict(size=12, color='blue'),
+        hovertext=prev["HOVER_TEXT"] if not prev.empty else [""],
+        hoverinfo='text'
+    ))
 
-        fig.add_trace(go.Scattermapbox(
-            lat=datos_filtrados["LATITUD"].iloc[:idx+1],
-            lon=datos_filtrados["LONGITUD"].iloc[:idx+1],
-            mode='lines',
-            line=dict(width=2, color='blue'),
-            hoverinfo='skip'
-        ))
+    # Línea hasta punto actual
+    fig.add_trace(go.Scattermapbox(
+        lat=datos_filtrados["LATITUD"].iloc[:idx+1],
+        lon=datos_filtrados["LONGITUD"].iloc[:idx+1],
+        mode='lines',
+        line=dict(width=2, color='blue'),
+        hoverinfo='skip'
+    ))
 
-    actual = datos_filtrados.iloc[idx]
+    # Punto actual
     fig.add_trace(go.Scattermapbox(
         lat=[actual["LATITUD"]],
         lon=[actual["LONGITUD"]],
@@ -152,14 +147,24 @@ else:
         hoverinfo='text'
     ))
 
+    # Vista fija
+    fecha_key = f"view_config_{fecha}"
+    if fecha_key not in st.session_state:
+        st.session_state[fecha_key] = {
+            "lat": datos_filtrados["LATITUD"].mean(),
+            "lon": datos_filtrados["LONGITUD"].mean(),
+            "zoom": 12
+        }
+
+    vista = st.session_state[fecha_key]
     fig.update_layout(
         mapbox=dict(
             style="open-street-map",
-            center={"lat": vista_fija["lat"], "lon": vista_fija["lon"]},
-            zoom=vista_fija["zoom"]
+            center={"lat": vista["lat"], "lon": vista["lon"]},
+            zoom=vista["zoom"]
         ),
         margin=dict(r=0, t=0, l=0, b=0),
-        uirevision="mapa-fijo"
+        uirevision=fecha_key
     )
 
     st.plotly_chart(fig, use_container_width=True)
