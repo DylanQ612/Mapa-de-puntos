@@ -150,10 +150,11 @@ if "view_config" not in st.session_state:
         "zoom": 12
     }
 
-mapbox_center = dict(
-    lat=st.session_state.view_config["lat"],
-    lon=st.session_state.view_config["lon"]
-)
+# === CORRECCIÓN PARA FIJAR VISTA DEL MAPA ===
+mapbox_center = {
+    "lat": st.session_state.view_config["lat"],
+    "lon": st.session_state.view_config["lon"]
+}
 
 fig.update_layout(
     mapbox=dict(
@@ -162,7 +163,7 @@ fig.update_layout(
         zoom=st.session_state.view_config["zoom"]
     ),
     margin=dict(r=0, t=0, l=0, b=0),
-    uirevision="fixed"  # Valor constante
+    uirevision="fixed"
 )
 
 st.plotly_chart(fig, use_container_width=True)
