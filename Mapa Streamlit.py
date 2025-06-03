@@ -65,6 +65,16 @@ fecha = st.selectbox("Seleccione una fecha", fechas)
 datos_filtrados = df[(df["GESTOR"] == gestor) & (df["FECHA_GESTION"].dt.strftime("%Y-%m-%d") == fecha)]
 datos_filtrados = datos_filtrados.sort_values("HORA_ORDEN").reset_index(drop=True)
 
+# === GUARDAR VISTA FIJA DEL MAPA UNA SOLA VEZ ===
+fecha_key = f"view_config_{fecha}"
+if fecha_key not in st.session_state:
+    st.session_state[fecha_key] = {
+        "lat": datos_filtrados["LATITUD"].mean(),
+        "lon": datos_filtrados["LONGITUD"].mean(),
+        "zoom": 12
+    }
+vista_fija = st.session_state[fecha_key]
+
 if len(datos_filtrados) == 0:
     st.warning("No hay datos para mostrar.")
 else:
@@ -142,26 +152,14 @@ else:
         hoverinfo='text'
     ))
 
-fecha_key = f"view_config_{fecha}"
-if fecha_key not in st.session_state:
-    st.session_state[fecha_key] = {
-        "lat": datos_filtrados["LATITUD"].mean(),
-        "lon": datos_filtrados["LONGITUD"].mean(),
-        "zoom": 12
-    }
+    fig.update_layout(
+        mapbox=dict(
+            style="open-street-map",
+            center={"lat": vista_fija["lat"], "lon": vista_fija["lon"]},
+            zoom=vista_fija["zoom"]
+        ),
+        margin=dict(r=0, t=0, l=0, b=0),
+        uirevision="mapa-fijo"
+    )
 
-# Usar los valores guardados sin recalcular
-vista_fija = st.session_state[fecha_key]
-
-fig.update_layout(
-    mapbox=dict(
-        style="open-street-map",
-        center={"lat": vista_fija["lat"], "lon": vista_fija["lon"]},
-        zoom=vista_fija["zoom"]
-    ),
-    margin=dict(r=0, t=0, l=0, b=0),
-    uirevision=fecha  # uirevision constante por fecha
-)
-
-st.plotly_chart(fig, use_container_width=True)
-
+    st.plotly_chart(fig, use_container_width=True)
